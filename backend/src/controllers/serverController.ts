@@ -15,7 +15,7 @@ const daemonRequest = async (node: any, method: string, path: string, data?: any
         'x-node-token': node.token,
         'Content-Type': 'application/json'
       },
-      timeout: 5000 // 5 seconds timeout
+      timeout: 600000 // 10 minutes timeout
     });
     return response.data;
   } catch (error: any) {
