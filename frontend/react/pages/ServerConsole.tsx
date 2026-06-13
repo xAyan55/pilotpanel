@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts';
-import { Terminal, Power, RotateCw, Play, CircleAlert, Folder, ToyBrick } from 'lucide-react';
+import { Terminal, Power, RotateCw, Play, CircleAlert, Folder, ToyBrick, Search, Pause, PlayCircle, Trash2, Download } from 'lucide-react';
 
 interface ServerDetails {
   name: string;
@@ -20,19 +20,34 @@ interface StatHistory {
   ram: number;
 }
 
+const LINE_HEIGHT = 20; // fixed height for virtualized lines (in pixels)
+
 const ServerConsole: React.FC = () => {
   const { uuid } = useParams<{ uuid: string }>();
   const { token } = useAuth();
   const navigate = useNavigate();
+  
   const [server, setServer] = useState<ServerDetails | null>(null);
-  const [status, setStatus] = useState('offline');
+  const [status, setStatus] = useState<string>('offline');
   const [logs, setLogs] = useState<string[]>([]);
   const [command, setCommand] = useState('');
   const [stats, setStats] = useState({ cpuUsage: 0, memoryUsage: 0, diskUsage: 0 });
   const [statHistory, setStatHistory] = useState<StatHistory[]>([]);
-  const logsEndRef = useRef<HTMLDivElement>(null);
+  
+  // Console Settings
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isPaused, setIsPaused] = useState(false);
+  const [commandHistory, setCommandHistory] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState(-1);
+
+  // Virtualization Scroll Container States
+  const [scrollTop, setScrollTop] = useState(0);
+  const [containerHeight, setContainerHeight] = useState(380);
+
+  const logsContainerRef = useRef<HTMLDivElement>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
+  // Load server details and open connection
   useEffect(() => {
     fetchServerDetails();
     connectWebSocket();
@@ -44,11 +59,36 @@ const ServerConsole: React.FC = () => {
     };
   }, [uuid, token]);
 
+  // Adjust container height dynamically on resize
   useEffect(() => {
-    if (logsEndRef.current) {
-      logsEndRef.current.scrollTop = logsEndRef.current.scrollHeight;
+    if (logsContainerRef.current) {
+      setContainerHeight(logsContainerRef.current.clientHeight || 380);
     }
-  }, [logs]);
+  }, [logsContainerRef.current]);
+
+  // Handle scroll events for virtualization & auto-pause
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    setScrollTop(target.scrollTop);
+    
+    // Auto-detect manual scroll up
+    const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 40;
+    if (!isAtBottom && !isPaused && searchQuery === '') {
+      // User scrolled up, pause auto-scroll
+      setIsPaused(true);
+    } else if (isAtBottom && isPaused && searchQuery === '') {
+      // User scrolled back to the bottom, resume auto-scroll
+      setIsPaused(false);
+    }
+  };
+
+  // Auto-scroll on new log arrival
+  useEffect(() => {
+    if (isPaused || searchQuery !== '') return;
+    if (logsContainerRef.current) {
+      logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
+    }
+  }, [logs, isPaused, searchQuery]);
 
   const fetchServerDetails = async () => {
     try {
@@ -74,10 +114,14 @@ const ServerConsole: React.FC = () => {
     ws.onmessage = (event) => {
       try {
         const payload = JSON.parse(event.data);
-        if (payload.event === 'console') {
-          // Clean terminal ansi color codes
+        if (payload.event === 'history') {
+          const cleanHistory = payload.data.map((l: any) => 
+            l.text.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '')
+          );
+          setLogs(cleanHistory);
+        } else if (payload.event === 'console') {
           const cleanLog = payload.data.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
-          setLogs((prev) => [...prev.slice(-300), cleanLog]); // Keep last 300 lines
+          setLogs((prev) => [...prev.slice(-999), cleanLog]);
         } else if (payload.event === 'status') {
           setStatus(payload.data);
         } else if (payload.event === 'stats') {
@@ -87,7 +131,6 @@ const ServerConsole: React.FC = () => {
             diskUsage: payload.data.diskUsage
           });
 
-          // Add to chart history (limit 20 entries)
           setStatHistory((prev) => {
             const next = [...prev, {
               time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }),
@@ -98,12 +141,12 @@ const ServerConsole: React.FC = () => {
           });
         }
       } catch {
-        setLogs((prev) => [...prev.slice(-300), event.data]);
+        setLogs((prev) => [...prev.slice(-999), event.data]);
       }
     };
 
     ws.onclose = () => {
-      setLogs((prev) => [...prev, '[System] WebSocket stream disconnected. Attempting reconnect...']);
+      setLogs((prev) => [...prev, '[System] WebSocket stream disconnected. Reconnecting in 5s...']);
       setTimeout(connectWebSocket, 5000);
     };
   };
@@ -126,8 +169,8 @@ const ServerConsole: React.FC = () => {
     }
   };
 
-  const handleSendCommand = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSendCommand = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     if (!command.trim() || !wsRef.current) return;
 
     wsRef.current.send(JSON.stringify({
@@ -135,9 +178,77 @@ const ServerConsole: React.FC = () => {
       data: command
     }));
 
+    setCommandHistory((prev) => [command, ...prev.slice(0, 49)]); // Store last 50 commands
+    setHistoryIndex(-1);
     setLogs((prev) => [...prev, `> ${command}`]);
     setCommand('');
   };
+
+  // Command History arrow key navigation & keyboard shortcuts
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (commandHistory.length > 0 && historyIndex < commandHistory.length - 1) {
+        const nextIdx = historyIndex + 1;
+        setHistoryIndex(nextIdx);
+        setCommand(commandHistory[nextIdx]);
+      }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (historyIndex > 0) {
+        const nextIdx = historyIndex - 1;
+        setHistoryIndex(nextIdx);
+        setCommand(commandHistory[nextIdx]);
+      } else if (historyIndex === 0) {
+        setHistoryIndex(-1);
+        setCommand('');
+      }
+    }
+  };
+
+  // Keyboard shortcut Ctrl + L for clear console
+  useEffect(() => {
+    const handleGlobalShortcuts = (e: KeyboardEvent) => {
+      if (e.ctrlKey && e.key.toLowerCase() === 'l') {
+        e.preventDefault();
+        setLogs([]);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalShortcuts);
+    return () => window.removeEventListener('keydown', handleGlobalShortcuts);
+  }, []);
+
+  const handleClearConsole = () => {
+    setLogs([]);
+  };
+
+  const handleDownloadLogs = () => {
+    const element = document.createElement("a");
+    const file = new Blob([logs.join("\n")], { type: 'text/plain' });
+    element.href = URL.createObjectURL(file);
+    element.download = `${server?.name || 'server'}-console.log`;
+    document.body.appendChild(element);
+    element.click();
+    document.body.removeChild(element);
+  };
+
+  // Log filter based on search query
+  const filteredLogs = useMemo(() => {
+    if (!searchQuery.trim()) return logs;
+    return logs.filter((l) => l.toLowerCase().includes(searchQuery.toLowerCase()));
+  }, [logs, searchQuery]);
+
+  // Virtualization Calculations
+  const totalHeight = filteredLogs.length * LINE_HEIGHT;
+  const startIndex = Math.max(0, Math.floor(scrollTop / LINE_HEIGHT) - 5);
+  const endIndex = Math.min(filteredLogs.length, Math.ceil((scrollTop + containerHeight) / LINE_HEIGHT) + 5);
+
+  const visibleLines = useMemo(() => {
+    return filteredLogs.slice(startIndex, endIndex).map((line, index) => ({
+      index: startIndex + index,
+      text: line
+    }));
+  }, [filteredLogs, startIndex, endIndex]);
 
   return (
     <div>
@@ -148,7 +259,7 @@ const ServerConsole: React.FC = () => {
             <span className={`badge ${status === 'online' ? 'badge-success' : status === 'offline' ? 'badge-danger' : 'badge-warning'}`}>
               {status}
             </span>
-            <span>IP Port: 127.0.0.1:{server?.port}</span>
+            <span>Port: {server?.port}</span>
             <span>{server?.software} ({server?.version})</span>
           </p>
         </div>
@@ -158,36 +269,112 @@ const ServerConsole: React.FC = () => {
             <Folder size={16} /> File Manager
           </button>
           <button className="btn btn-secondary" onClick={() => navigate(`/servers/${uuid}/plugins`)}>
-            <ToyBrick size={16} /> Plugins
+            <ToyBrick size={16} /> Plugins / Mods
           </button>
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '2rem', marginBottom: '2rem' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-          <div className="console-wrapper">
-            <div className="console-logs" ref={logsEndRef}>
-              {logs.length === 0 ? (
-                <div style={{ color: '#929AAB', textAlign: 'center', marginTop: '5rem' }}>
-                  Connecting to server output stream...
-                </div>
-              ) : (
-                logs.map((line, idx) => (
-                  <div key={idx} className="console-line">
-                    {line}
+          
+          {/* Terminal Console */}
+          <div className="console-wrapper" style={{ height: '480px' }}>
+            
+            {/* Console Toolbar */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.75rem', paddingBottom: '0.75rem', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flex: 1, maxWidth: '280px' }}>
+                <Search size={14} color="#929AAB" />
+                <input
+                  type="text"
+                  placeholder="Filter logs..."
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'white',
+                    fontSize: '0.8rem',
+                    width: '100%'
+                  }}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </div>
+
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.05)', color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}
+                  onClick={() => setIsPaused(!isPaused)}
+                  title={isPaused ? "Resume auto-scroll" : "Pause auto-scroll"}
+                >
+                  {isPaused ? <PlayCircle size={12} style={{ marginRight: '4px' }} /> : <Pause size={12} style={{ marginRight: '4px' }} />}
+                  {isPaused ? "Resumed" : "Scroll Paused"}
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.05)', color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}
+                  onClick={handleClearConsole}
+                >
+                  <Trash2 size={12} style={{ marginRight: '4px' }} /> Clear
+                </button>
+                <button
+                  className="btn btn-secondary"
+                  style={{ padding: '0.25rem 0.6rem', fontSize: '0.75rem', background: 'rgba(255,255,255,0.05)', color: 'white', borderColor: 'rgba(255,255,255,0.1)' }}
+                  onClick={handleDownloadLogs}
+                >
+                  <Download size={12} style={{ marginRight: '4px' }} /> Download
+                </button>
+              </div>
+            </div>
+
+            {/* Virtualized Logs Window */}
+            <div
+              className="console-logs"
+              ref={logsContainerRef}
+              onScroll={handleScroll}
+              style={{
+                position: 'relative',
+                overflowY: 'auto',
+                overflowX: 'auto',
+                whiteSpace: 'pre',
+                lineHeight: `${LINE_HEIGHT}px`
+              }}
+            >
+              <div style={{ height: `${totalHeight}px`, width: '100%', position: 'relative' }}>
+                {visibleLines.map((line) => (
+                  <div
+                    key={line.index}
+                    className="console-line"
+                    style={{
+                      position: 'absolute',
+                      top: `${line.index * LINE_HEIGHT}px`,
+                      left: 0,
+                      right: 0,
+                      height: `${LINE_HEIGHT}px`,
+                      display: 'flex',
+                      alignItems: 'center'
+                    }}
+                  >
+                    {line.text}
                   </div>
-                ))
+                ))}
+              </div>
+              {filteredLogs.length === 0 && (
+                <div style={{ color: '#929AAB', textAlign: 'center', padding: '4rem' }}>
+                  {searchQuery ? "No log lines match your query." : "Connecting to console output..."}
+                </div>
               )}
             </div>
 
+            {/* Command Input */}
             <form onSubmit={handleSendCommand} className="console-input-wrapper">
               <span className="console-input-prefix">$</span>
               <input
                 type="text"
                 className="console-input"
-                placeholder="Type command here (e.g. op username)..."
+                placeholder="Type Minecraft command here (Press Up/Down for history)..."
                 value={command}
                 onChange={(e) => setCommand(e.target.value)}
+                onKeyDown={handleKeyDown}
               />
             </form>
           </div>

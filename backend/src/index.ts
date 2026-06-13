@@ -6,9 +6,9 @@ import dotenv from 'dotenv';
 import { authenticateJWT, authenticateNode, requireRole } from './middleware/auth';
 import { register, login, enable2FA, disable2FA, getMe } from './controllers/authController';
 import { registerNode, getNodes, deleteNode, heartbeat } from './controllers/nodeController';
-import { createServer, getServers, getServerDetail, handlePowerAction, deleteServer, fileManagerRelay } from './controllers/serverController';
+import { createServer, getServers, getServerDetail, handlePowerAction, deleteServer, fileManagerRelay, detectServerAddons } from './controllers/serverController';
 import { getPlans, createPlan, getInvoices, createInvoice, processPaymentMock } from './controllers/billingController';
-import { searchPlugins, getPopularRecommendations } from './controllers/pluginController';
+import { searchPlugins, getPopularRecommendations, installPlugin } from './controllers/pluginController';
 import { createTicket, getTickets, getTicketDetails, addTicketMessage, getArticles, createArticle } from './controllers/supportController';
 import { initWebSocketServer } from './websocket/wsServer';
 import prisma from './config/db';
@@ -40,6 +40,7 @@ app.post('/api/nodes/heartbeat', authenticateNode, heartbeat);
 app.post('/api/servers', authenticateJWT, requireRole(['Owner', 'Administrator']), createServer);
 app.get('/api/servers', authenticateJWT, getServers);
 app.get('/api/servers/:uuid', authenticateJWT, getServerDetail);
+app.get('/api/servers/:uuid/detect', authenticateJWT, detectServerAddons);
 app.post('/api/servers/:uuid/power', authenticateJWT, handlePowerAction);
 app.delete('/api/servers/:uuid', authenticateJWT, requireRole(['Owner', 'Administrator']), deleteServer);
 
@@ -56,6 +57,7 @@ app.post('/api/billing/invoices/:invoiceId/pay', authenticateJWT, processPayment
 // Plugin / Mod routes
 app.get('/api/plugins/search', authenticateJWT, searchPlugins);
 app.get('/api/plugins/popular', authenticateJWT, getPopularRecommendations);
+app.post('/api/servers/:uuid/plugins/install', authenticateJWT, installPlugin);
 
 // Support & Knowledge Base routes
 app.post('/api/support/tickets', authenticateJWT, createTicket);

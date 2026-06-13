@@ -250,7 +250,59 @@ export const fileManagerRelay = async (req: AuthenticatedRequest, res: Response)
       return res.status(403).json({ error: 'Unauthorized.' });
     }
 
+    const targetUrl = `http://${server.node.ipAddress}:${server.node.port}/api/servers/${uuid}/files${pathSuffix}`;
+
+    // Handle Streaming endpoints (Upload & Download)
+    if (pathSuffix.includes('/download') || pathSuffix.includes('/upload')) {
+      const response = await axios({
+        method,
+        url: targetUrl,
+        headers: {
+          'x-node-token': server.node.token,
+          'Content-Type': req.headers['content-type'] || 'application/octet-stream'
+        },
+        params: req.query,
+        responseType: 'stream',
+        data: method === 'POST' ? req : undefined // Pipe client request stream directly to axios for uploads
+      });
+
+      // Forward response headers
+      if (typeof response.headers['content-disposition'] === 'string') {
+        res.setHeader('Content-Disposition', response.headers['content-disposition']);
+      }
+      if (typeof response.headers['content-type'] === 'string') {
+        res.setHeader('Content-Type', response.headers['content-type']);
+      }
+
+      response.data.pipe(res);
+      return;
+    }
+
+    // Otherwise standard JSON API requests
     const data = await daemonRequest(server.node, method, `/api/servers/${uuid}/files${pathSuffix}`, req.body);
+    return res.json(data);
+  } catch (error: any) {
+    return res.status(502).json({ error: error.message });
+  }
+};
+
+export const detectServerAddons = async (req: AuthenticatedRequest, res: Response) => {
+  const { uuid } = req.params;
+  try {
+    const server = await prisma.server.findUnique({
+      where: { uuid },
+      include: { node: true }
+    });
+
+    if (!server) {
+      return res.status(404).json({ error: 'Server not found.' });
+    }
+
+    if (req.user?.role === 'Client' && server.userId !== req.user.id) {
+      return res.status(403).json({ error: 'Unauthorized.' });
+    }
+
+    const data = await daemonRequest(server.node, 'GET', `/api/servers/${uuid}/detect`);
     return res.json(data);
   } catch (error: any) {
     return res.status(502).json({ error: error.message });

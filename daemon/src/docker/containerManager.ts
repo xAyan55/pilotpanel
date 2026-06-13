@@ -178,7 +178,7 @@ export const createServerContainer = async (config: {
     AttachStdin: true,
     AttachStdout: true,
     AttachStderr: true,
-    Tty: true,
+    Tty: false,
     OpenStdin: true,
     StdinOnce: false,
     HostConfig: {

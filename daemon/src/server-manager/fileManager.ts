@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import archiver from 'archiver';
 import unzipper from 'unzipper';
+import * as tar from 'tar';
 import { getVolumePath } from '../docker/containerManager';
 
 // Verify file target remains in the server's sandbox data directory
@@ -99,13 +100,45 @@ export const renameOrMoveFile = (serverUuid: string, oldPath: string, newPath: s
   return { success: true };
 };
 
+export const copyFileOrFolder = (serverUuid: string, oldPath: string, newPath: string) => {
+  const source = safePath(serverUuid, oldPath);
+  const dest = safePath(serverUuid, newPath);
+
+  if (!fs.existsSync(source)) {
+    throw new Error('Source file/folder not found.');
+  }
+
+  // Ensure dest parent dir exists
+  const destParent = path.dirname(dest);
+  if (!fs.existsSync(destParent)) {
+    fs.mkdirSync(destParent, { recursive: true });
+  }
+
+  const stats = fs.statSync(source);
+  if (stats.isDirectory()) {
+    fs.cpSync(source, dest, { recursive: true });
+  } else {
+    fs.copyFileSync(source, dest);
+  }
+
+  return { success: true };
+};
+
 export const zipFiles = (serverUuid: string, folderToZip: string, archiveName: string) => {
   const source = safePath(serverUuid, folderToZip);
   const dest = safePath(serverUuid, archiveName);
 
   return new Promise<void>((resolve, reject) => {
     const output = fs.createWriteStream(dest);
-    const archive = archiver('zip', { zlib: { level: 9 } });
+    
+    let archive;
+    if (archiveName.endsWith('.tar.gz') || archiveName.endsWith('.tgz')) {
+      archive = archiver('tar', { gzip: true, gzipOptions: { level: 9 } });
+    } else if (archiveName.endsWith('.tar')) {
+      archive = archiver('tar');
+    } else {
+      archive = archiver('zip', { zlib: { level: 9 } });
+    }
 
     output.on('close', resolve);
     archive.on('error', reject);
@@ -131,10 +164,25 @@ export const unzipFile = (serverUuid: string, archivePath: string, extractFolder
     throw new Error('Archive file not found.');
   }
 
-  return new Promise<void>((resolve, reject) => {
-    fs.createReadStream(source)
-      .pipe(unzipper.Extract({ path: dest }))
-      .on('close', resolve)
-      .on('error', reject);
-  });
+  // Ensure dest folder exists
+  if (!fs.existsSync(dest)) {
+    fs.mkdirSync(dest, { recursive: true });
+  }
+
+  if (archivePath.endsWith('.zip')) {
+    return new Promise<void>((resolve, reject) => {
+      fs.createReadStream(source)
+        .pipe(unzipper.Extract({ path: dest }))
+        .on('close', resolve)
+        .on('error', reject);
+    });
+  } else if (archivePath.endsWith('.tar') || archivePath.endsWith('.tar.gz') || archivePath.endsWith('.tgz')) {
+    return tar.x({
+      file: source,
+      C: dest
+    });
+  } else {
+    throw new Error('Unsupported archive format.');
+  }
 };
+
