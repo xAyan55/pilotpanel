@@ -73,8 +73,8 @@ app.get('/api/dashboard/stats', authenticateJWT, async (req: any, res) => {
     
     // Sum total resources
     const servers = await prisma.server.findMany();
-    const totalRam = servers.reduce((acc, s) => acc + s.memoryLimit, 0);
-    const totalCpu = servers.reduce((acc, s) => acc + s.cpuLimit, 0);
+    const totalRam = servers.reduce((acc: number, s: any) => acc + s.memoryLimit, 0);
+    const totalCpu = servers.reduce((acc: number, s: any) => acc + s.cpuLimit, 0);
 
     return res.json({
       totalServers: serversCount,
