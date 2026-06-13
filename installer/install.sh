@@ -37,7 +37,7 @@ echo -e "System OS detected: ${COLOR_SUCCESS}${OS}${COLOR_RESET}"
 # 1. Install Docker & Dependencies
 echo -e "${COLOR_INFO}Step 1: Installing Docker, Docker Compose, and Nginx...${COLOR_RESET}"
 apt-get update -y
-apt-get install -y curl gnupg lsb-release nginx ufw git nodejs npm pgclient
+apt-get install -y curl gnupg lsb-release nginx ufw git nodejs npm postgresql-client
 
 if ! [ -x "$(command -v docker)" ]; then
   curl -fsSL https://get.docker.com | sh
