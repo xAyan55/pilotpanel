@@ -4,13 +4,14 @@ import prisma from '../config/db';
 import { AuthenticatedRequest } from '../middleware/auth';
 
 // Helper to make request to PilotDaemon
-const daemonRequest = async (node: any, method: string, path: string, data?: any) => {
+const daemonRequest = async (node: any, method: string, path: string, data?: any, params?: any) => {
   const url = `http://${node.ipAddress}:${node.port}${path}`;
   try {
     const response = await axios({
       method,
       url,
       data,
+      params,
       headers: {
         'x-node-token': node.token,
         'Content-Type': 'application/json'
@@ -279,7 +280,7 @@ export const fileManagerRelay = async (req: AuthenticatedRequest, res: Response)
     }
 
     // Otherwise standard JSON API requests
-    const data = await daemonRequest(server.node, method, `/api/servers/${uuid}/files${pathSuffix}`, req.body);
+    const data = await daemonRequest(server.node, method, `/api/servers/${uuid}/files${pathSuffix}`, req.body, req.query);
     return res.json(data);
   } catch (error: any) {
     return res.status(502).json({ error: error.message });

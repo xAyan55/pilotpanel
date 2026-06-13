@@ -115,11 +115,13 @@ const ServerConsole: React.FC = () => {
       try {
         const payload = JSON.parse(event.data);
         if (payload.event === 'history') {
+          console.log(`[FRONTEND] Received history logs event. Count = ${payload.data.length}`);
           const cleanHistory = payload.data.map((l: any) => 
             l.text.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '')
           );
           setLogs(cleanHistory);
         } else if (payload.event === 'console') {
+          console.log(`[FRONTEND] Received console event: "${payload.data}"`);
           const cleanLog = payload.data.replace(/[\u001b\u009b][[()#;?]*(?:[0-9]{1,4}(?:;[0-9]{0,4})*)?[0-9A-ORZcf-nqry=><]/g, '');
           setLogs((prev) => [...prev.slice(-999), cleanLog]);
         } else if (payload.event === 'status') {

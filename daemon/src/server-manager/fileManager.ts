@@ -6,63 +6,102 @@ import * as tar from 'tar';
 import { getVolumePath } from '../docker/containerManager';
 
 // Verify file target remains in the server's sandbox data directory
-const safePath = (serverUuid: string, relativePath: string = '') => {
-  const root = getVolumePath(serverUuid);
-  const target = path.normalize(path.join(root, relativePath));
-  if (!target.startsWith(root)) {
+export const safePath = (serverUuid: string, relativePath: string = '') => {
+  const root = path.resolve(getVolumePath(serverUuid));
+  
+  // Strip drive letters (Windows) and leading slashes to prevent absolute breakouts
+  let cleanRelative = relativePath.replace(/^[a-zA-Z]:/, '');
+  cleanRelative = path.normalize(cleanRelative).replace(/^\\|^\//, '');
+  
+  const target = path.resolve(root, cleanRelative);
+  const relative = path.relative(root, target);
+  
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    console.error(`[FILE_MANAGER] Traversal blocked! Root: ${root}, Requested: ${relativePath}, Target: ${target}`);
     throw new Error('Access denied: directory traversal detected.');
   }
   return target;
 };
 
 export const listFiles = (serverUuid: string, dirPath: string = '') => {
-  const target = safePath(serverUuid, dirPath);
+  console.log(`[FILE_MANAGER] Requested list files for path: "${dirPath}"`);
+  try {
+    const target = safePath(serverUuid, dirPath);
+    console.log(`[FILE_MANAGER] Resolved path: "${target}"`);
 
-  if (!fs.existsSync(target)) {
-    return [];
-  }
-
-  const items = fs.readdirSync(target, { withFileTypes: true });
-
-  return items.map((item) => {
-    const filePath = path.join(target, item.name);
-    let stats;
-    try {
-      stats = fs.statSync(filePath);
-    } catch {
-      stats = { size: 0, mtime: new Date() };
+    if (!fs.existsSync(target)) {
+      console.warn(`[FILE_MANAGER] Path does not exist: "${target}"`);
+      return [];
     }
 
-    return {
-      name: item.name,
-      isDirectory: item.isDirectory(),
-      size: stats.size,
-      modified: stats.mtime
-    };
-  });
+    const items = fs.readdirSync(target, { withFileTypes: true });
+    console.log(`[FILE_MANAGER] Result: Success. Found ${items.length} items.`);
+
+    return items.map((item) => {
+      const filePath = path.join(target, item.name);
+      let stats;
+      try {
+        stats = fs.statSync(filePath);
+      } catch {
+        stats = { size: 0, mtime: new Date() };
+      }
+
+      return {
+        name: item.name,
+        isDirectory: item.isDirectory(),
+        size: stats.size,
+        modified: stats.mtime
+      };
+    });
+  } catch (err: any) {
+    console.error(`[FILE_MANAGER] Error listing files for "${dirPath}": ${err.message}`);
+    throw err;
+  }
 };
 
 export const readFileContent = (serverUuid: string, filePath: string) => {
-  const target = safePath(serverUuid, filePath);
+  console.log(`[FILE_MANAGER] Requested read file path: "${filePath}"`);
+  try {
+    const target = safePath(serverUuid, filePath);
+    console.log(`[FILE_MANAGER] Resolved path: "${target}"`);
 
-  if (!fs.existsSync(target) || fs.statSync(target).isDirectory()) {
-    throw new Error('File not found or is a directory.');
+    if (!fs.existsSync(target)) {
+      console.error(`[FILE_MANAGER] Error: ENOENT (file not found: "${target}")`);
+      throw new Error(`ENOENT: no such file or directory, open '${filePath}'`);
+    }
+    if (fs.statSync(target).isDirectory()) {
+      console.error(`[FILE_MANAGER] Error: EISDIR (is a directory: "${target}")`);
+      throw new Error(`EISDIR: illegal operation on a directory, read`);
+    }
+
+    const content = fs.readFileSync(target, 'utf-8');
+    console.log(`[FILE_MANAGER] Result: Success (${content.length} chars)`);
+    return content;
+  } catch (error: any) {
+    console.error(`[FILE_MANAGER] Error reading file: ${error.message}`);
+    throw error;
   }
-
-  return fs.readFileSync(target, 'utf-8');
 };
 
 export const writeFileContent = (serverUuid: string, filePath: string, content: string) => {
-  const target = safePath(serverUuid, filePath);
-  
-  // Ensure target folder exists
-  const parent = path.dirname(target);
-  if (!fs.existsSync(parent)) {
-    fs.mkdirSync(parent, { recursive: true });
-  }
+  console.log(`[FILE_MANAGER] Requested write file path: "${filePath}"`);
+  try {
+    const target = safePath(serverUuid, filePath);
+    console.log(`[FILE_MANAGER] Resolved path: "${target}"`);
+    
+    // Ensure target folder exists
+    const parent = path.dirname(target);
+    if (!fs.existsSync(parent)) {
+      fs.mkdirSync(parent, { recursive: true });
+    }
 
-  fs.writeFileSync(target, content, 'utf-8');
-  return { success: true };
+    fs.writeFileSync(target, content, 'utf-8');
+    console.log(`[FILE_MANAGER] Result: Success`);
+    return { success: true };
+  } catch (error: any) {
+    console.error(`[FILE_MANAGER] Error writing file: ${error.message}`);
+    throw error;
+  }
 };
 
 export const deleteFileOrFolder = (serverUuid: string, filePath: string) => {

@@ -124,6 +124,7 @@ export class ServerSession {
       this.logs.shift(); // Keep size capped at 1000
     }
 
+    console.log(`[WS] Sending console line: ${cleanText}`);
     // Broadcast to ws clients
     this.broadcast('console', cleanText);
   }
@@ -150,9 +151,11 @@ export class ServerSession {
           return;
         }
 
+        const hasTty = info.Config.Tty;
+        console.log(`[CONSOLE] Container pilotpanel-${this.serverUuid} is running. Tty = ${hasTty}`);
         this.broadcast('status', 'online');
         
-        // Attach Docker socket with demuxing enabled
+        // Attach Docker socket with demuxing or raw stream enabled
         this.attachStream = await this.container.attach({
           stream: true,
           stdin: true,
@@ -162,44 +165,61 @@ export class ServerSession {
           tail: 1000
         } as any);
 
-        // Demux Docker Multiplexed Frame header
-        let streamBuffer = Buffer.alloc(0);
-        let stdoutBuffer = '';
-        let stderrBuffer = '';
-
-        this.attachStream.on('data', (chunk: Buffer) => {
-          streamBuffer = Buffer.concat([streamBuffer, chunk]);
-
-          while (streamBuffer.length >= 8) {
-            const type = streamBuffer.readUInt8(0);
-            const size = streamBuffer.readUInt32BE(4);
-
-            if (streamBuffer.length < 8 + size) {
-              break; // Wait for the whole payload
+        if (hasTty) {
+          let stdoutBuffer = '';
+          this.attachStream.on('data', (chunk: Buffer) => {
+            const rawText = chunk.toString('utf8');
+            stdoutBuffer += rawText;
+            let idx;
+            while ((idx = stdoutBuffer.indexOf('\n')) !== -1) {
+              const line = stdoutBuffer.substring(0, idx);
+              stdoutBuffer = stdoutBuffer.substring(idx + 1);
+              console.log(`[CONSOLE] Received log line: ${line}`);
+              this.appendLog('stdout', line);
             }
+          });
+        } else {
+          // Demux Docker Multiplexed Frame header
+          let streamBuffer = Buffer.alloc(0);
+          let stdoutBuffer = '';
+          let stderrBuffer = '';
 
-            const payload = streamBuffer.subarray(8, 8 + size).toString('utf8');
-            streamBuffer = streamBuffer.subarray(8 + size);
+          this.attachStream.on('data', (chunk: Buffer) => {
+            streamBuffer = Buffer.concat([streamBuffer, chunk]);
 
-            if (type === 1) { // stdout
-              stdoutBuffer += payload;
-              let idx;
-              while ((idx = stdoutBuffer.indexOf('\n')) !== -1) {
-                const line = stdoutBuffer.substring(0, idx);
-                stdoutBuffer = stdoutBuffer.substring(idx + 1);
-                this.appendLog('stdout', line);
+            while (streamBuffer.length >= 8) {
+              const type = streamBuffer.readUInt8(0);
+              const size = streamBuffer.readUInt32BE(4);
+
+              if (streamBuffer.length < 8 + size) {
+                break; // Wait for the whole payload
               }
-            } else if (type === 2) { // stderr
-              stderrBuffer += payload;
-              let idx;
-              while ((idx = stderrBuffer.indexOf('\n')) !== -1) {
-                const line = stderrBuffer.substring(0, idx);
-                stderrBuffer = stderrBuffer.substring(idx + 1);
-                this.appendLog('stderr', line);
+
+              const payload = streamBuffer.subarray(8, 8 + size).toString('utf8');
+              streamBuffer = streamBuffer.subarray(8 + size);
+
+              if (type === 1) { // stdout
+                stdoutBuffer += payload;
+                let idx;
+                while ((idx = stdoutBuffer.indexOf('\n')) !== -1) {
+                  const line = stdoutBuffer.substring(0, idx);
+                  stdoutBuffer = stdoutBuffer.substring(idx + 1);
+                  console.log(`[CONSOLE] Received log line (stdout): ${line}`);
+                  this.appendLog('stdout', line);
+                }
+              } else if (type === 2) { // stderr
+                stderrBuffer += payload;
+                let idx;
+                while ((idx = stderrBuffer.indexOf('\n')) !== -1) {
+                  const line = stderrBuffer.substring(0, idx);
+                  stdoutBuffer = stderrBuffer.substring(idx + 1);
+                  console.log(`[CONSOLE] Received log line (stderr): ${line}`);
+                  this.appendLog('stderr', line);
+                }
               }
             }
-          }
-        });
+          });
+        }
 
         this.attachStream.on('end', () => {
           this.attachStream = null;

@@ -66,6 +66,12 @@ export const initWebSocketServer = (server: HttpServer) => {
       });
 
       daemonWs.on('message', (message) => {
+        try {
+          const payload = JSON.parse(message.toString());
+          if (payload.event === 'console') {
+            console.log(`[WS] Relayed console line: ${payload.data}`);
+          }
+        } catch {}
         if (ws.readyState === WebSocket.OPEN) {
           ws.send(message.toString());
         }
