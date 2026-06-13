@@ -1,0 +1,120 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id               String          @id @default(uuid())
+  email            String          @unique
+  password         String
+  role             String          @default("Client") // "Owner", "Administrator", "Support", "Moderator", "Client"
+  twoFactorSecret  String?
+  twoFactorEnabled Boolean         @default(false)
+  isSuspended      Boolean         @default(false)
+  isBanned         Boolean         @default(false)
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  servers          Server[]
+  invoices         Invoice[]
+  tickets          Ticket[]
+  ticketMessages   TicketMessage[]
+  auditLogs        AuditLog[]
+}
+
+model Node {
+  id            String   @id @default(uuid())
+  name          String
+  ipAddress     String
+  port          Int      @default(3001) // PilotDaemon WebSocket/API port
+  token         String   // Shared secret token for communication
+  isHealthy     Boolean  @default(true)
+  lastHeartbeat DateTime @default(now())
+  createdAt     DateTime @default(now())
+  servers       Server[]
+}
+
+model Server {
+  id                String   @id @default(uuid())
+  name              String
+  uuid              String   @unique @default(uuid())
+  nodeId            String
+  node              Node     @relation(fields: [nodeId], references: [id], onDelete: Cascade)
+  dockerContainerId String?
+  cpuLimit          Float    @default(1.0) // CPU cores
+  memoryLimit       Int      @default(1024) // in MB
+  diskLimit         Int      @default(10000) // in MB
+  status            String   @default("offline") // "offline", "starting", "online", "stopping", "suspended"
+  port              Int      @unique // Main Minecraft port (e.g., 25565)
+  userId            String
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  software          String   // "Paper", "Purpur", "Spigot", etc.
+  version           String   // e.g. "1.20.6"
+  createdAt         DateTime @default(now())
+}
+
+model BillingPlan {
+  id           String   @id @default(uuid())
+  name         String
+  ram          Int      // in MB
+  cpu          Float    // Cores
+  disk         Int      // in MB
+  price        Float
+  billingCycle String   // "Monthly", "Quarterly", "Semi-Annual", "Annual"
+  createdAt    DateTime @default(now())
+}
+
+model Invoice {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount    Float
+  status    String   // "paid", "unpaid", "void"
+  gateway   String   // "Stripe", "PayPal", "Razorpay"
+  paymentId String?
+  createdAt DateTime @default(now())
+}
+
+model Ticket {
+  id        String          @id @default(uuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  category  String          // "Billing", "Technical", "General"
+  priority  String          // "Low", "Medium", "High"
+  status    String          @default("Open") // "Open", "Closed", "CustomerReply", "StaffReply"
+  createdAt DateTime        @default(now())
+  messages  TicketMessage[]
+}
+
+model TicketMessage {
+  id           String   @id @default(uuid())
+  ticketId     String
+  ticket       Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message      String
+  isStaffReply Boolean  @default(false)
+  createdAt    DateTime @default(now())
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  userId    String?
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  action    String   // e.g., "USER_LOGIN", "SERVER_START", "TICKET_CREATE"
+  details   String
+  ipAddress String
+  createdAt DateTime @default(now())
+}
+
+model KnowledgeBaseArticle {
+  id        String   @id @default(uuid())
+  title     String
+  content   String
+  category  String
+  createdAt DateTime @default(now())
+}

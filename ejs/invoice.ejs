@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Invoice - PilotPanel</title>
+  <style>
+    body { font-family: 'Outfit', Arial, sans-serif; background-color: #F7F7F7; color: #393E46; margin: 0; padding: 40px; }
+    .container { max-width: 600px; margin: 0 auto; background: #ffffff; padding: 40px; border-radius: 18px; border: 1px solid rgba(0,0,0,0.05); }
+    .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #EEEEEE; padding-bottom: 20px; margin-bottom: 30px; }
+    .logo { font-size: 20px; font-weight: 700; }
+    .inv-details { text-align: right; font-size: 14px; color: #686D76; }
+    .item-table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+    .item-table th { text-align: left; padding: 10px; border-bottom: 1px solid #EEEEEE; color: #929AAB; font-size: 12px; text-transform: uppercase; }
+    .item-table td { padding: 15px 10px; border-bottom: 1px solid #EEEEEE; font-size: 14px; }
+    .total-section { display: flex; justify-content: flex-end; font-size: 16px; font-weight: 700; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="logo">PilotPanel</div>
+      <div class="inv-details">
+        <div>Invoice #<%= invoiceId %></div>
+        <div>Date: <%= date %></div>
+      </div>
+    </div>
+    
+    <table class="item-table">
+      <thead>
+        <tr>
+          <th>Description</th>
+          <th style="text-align: right;">Amount</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>PilotPanel Server Subscription slot - Tier: <%= planName %></td>
+          <td style="text-align: right; font-weight: 600;">$<%= amount.toFixed(2) %></td>
+        </tr>
+      </tbody>
+    </table>
+    
+    <div class="total-section">
+      Total Paid: $<%= amount.toFixed(2) %>
+    </div>
+  </div>
+</body>
+</html>
