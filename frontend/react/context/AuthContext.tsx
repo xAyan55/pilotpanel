@@ -4,6 +4,7 @@ interface User {
   id: string;
   email: string;
   role: string;
+  twoFactorEnabled?: boolean;
 }
 
 interface AuthContextType {
@@ -28,7 +29,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
       try {
-        const response = await fetch('http://localhost:3000/api/auth/me', {
+        const response = await fetch('/api/auth/me', {
           headers: {
             'Authorization': `Bearer ${token}`
           }

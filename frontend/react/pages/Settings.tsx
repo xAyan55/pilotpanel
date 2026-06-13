@@ -33,7 +33,7 @@ const Settings: React.FC = () => {
 
   const fetchAuditLogs = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/admin/audit-logs', {
+      const res = await fetch('/api/admin/audit-logs', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -45,7 +45,7 @@ const Settings: React.FC = () => {
   const handleToggle2FA = async () => {
     try {
       if (twoFactorEnabled) {
-        const res = await fetch('http://localhost:3000/api/auth/2fa/disable', {
+        const res = await fetch('/api/auth/2fa/disable', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -55,7 +55,7 @@ const Settings: React.FC = () => {
           setQrCodeUrl('');
         }
       } else {
-        const res = await fetch('http://localhost:3000/api/auth/2fa/enable', {
+        const res = await fetch('/api/auth/2fa/enable', {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -74,7 +74,7 @@ const Settings: React.FC = () => {
   const handleRegisterNode = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch('http://localhost:3000/api/nodes/register', {
+      const res = await fetch('/api/nodes/register', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

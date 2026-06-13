@@ -31,7 +31,7 @@ const PluginManager: React.FC = () => {
   const fetchRecommendations = async () => {
     setLoading(true);
     try {
-      const res = await fetch('http://localhost:3000/api/plugins/popular', {
+      const res = await fetch('/api/plugins/popular', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -47,7 +47,7 @@ const PluginManager: React.FC = () => {
 
   const checkInstalledJars = async () => {
     try {
-      const res = await fetch(`http://localhost:3000/api/servers/${uuid}/files?path=plugins`, {
+      const res = await fetch(`/api/servers/${uuid}/files?path=plugins`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -70,7 +70,7 @@ const PluginManager: React.FC = () => {
 
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:3000/api/plugins/search?query=${encodeURIComponent(query)}&source=${source}`, {
+      const res = await fetch(`/api/plugins/search?query=${encodeURIComponent(query)}&source=${source}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -90,7 +90,7 @@ const PluginManager: React.FC = () => {
 
     try {
       // Direct call to write a mock Jar byte-buffer or file inside the plugins directory
-      const res = await fetch(`http://localhost:3000/api/servers/${uuid}/files/write`, {
+      const res = await fetch(`/api/servers/${uuid}/files/write`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

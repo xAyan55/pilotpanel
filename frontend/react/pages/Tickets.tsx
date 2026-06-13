@@ -70,10 +70,10 @@ const Tickets: React.FC = () => {
   const fetchTicketsAndKB = async () => {
     setLoading(true);
     try {
-      const tRes = await fetch('http://localhost:3000/api/support/tickets', {
+      const tRes = await fetch('/api/support/tickets', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const kbRes = await fetch('http://localhost:3000/api/support/kb', {
+      const kbRes = await fetch('/api/support/kb', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -87,7 +87,7 @@ const Tickets: React.FC = () => {
 
   const fetchTicketDetails = async (id: string) => {
     try {
-      const res = await fetch(`http://localhost:3000/api/support/tickets/${id}`, {
+      const res = await fetch(`/api/support/tickets/${id}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -104,7 +104,7 @@ const Tickets: React.FC = () => {
 
     setSubmitting(true);
     try {
-      const res = await fetch('http://localhost:3000/api/support/tickets', {
+      const res = await fetch('/api/support/tickets', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -132,7 +132,7 @@ const Tickets: React.FC = () => {
 
     setSendingReply(true);
     try {
-      const res = await fetch(`http://localhost:3000/api/support/tickets/${selectedTicketId}/messages`, {
+      const res = await fetch(`/api/support/tickets/${selectedTicketId}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

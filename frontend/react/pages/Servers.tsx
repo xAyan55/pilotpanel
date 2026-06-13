@@ -54,7 +54,7 @@ const Servers: React.FC = () => {
 
   const fetchServers = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/servers', {
+      const res = await fetch('/api/servers', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -70,7 +70,7 @@ const Servers: React.FC = () => {
 
   const fetchNodes = async () => {
     try {
-      const res = await fetch('http://localhost:3000/api/nodes', {
+      const res = await fetch('/api/nodes', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -89,7 +89,7 @@ const Servers: React.FC = () => {
     setCreating(true);
 
     try {
-      const res = await fetch('http://localhost:3000/api/servers', {
+      const res = await fetch('/api/servers', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -128,7 +128,7 @@ const Servers: React.FC = () => {
     if (!window.confirm('Are you sure you want to permanently delete this server and all its files?')) return;
 
     try {
-      const res = await fetch(`http://localhost:3000/api/servers/${uuid}`, {
+      const res = await fetch(`/api/servers/${uuid}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });

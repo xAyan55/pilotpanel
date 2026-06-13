@@ -52,7 +52,7 @@ const ServerConsole: React.FC = () => {
 
   const fetchServerDetails = async () => {
     try {
-      const res = await fetch(`http://localhost:3000/api/servers/${uuid}`, {
+      const res = await fetch(`/api/servers/${uuid}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -66,7 +66,8 @@ const ServerConsole: React.FC = () => {
   const connectWebSocket = () => {
     if (wsRef.current) wsRef.current.close();
 
-    const wsUrl = `ws://localhost:3000/api/ws?token=${token}&server=${uuid}`;
+    const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${wsProtocol}//${window.location.host}/api/ws?token=${token}&server=${uuid}`;
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
@@ -109,7 +110,7 @@ const ServerConsole: React.FC = () => {
 
   const sendPowerAction = async (action: string) => {
     try {
-      const res = await fetch(`http://localhost:3000/api/servers/${uuid}/power`, {
+      const res = await fetch(`/api/servers/${uuid}/power`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

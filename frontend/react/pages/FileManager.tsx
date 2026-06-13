@@ -35,7 +35,7 @@ const FileManager: React.FC = () => {
   const fetchFiles = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:3000/api/servers/${uuid}/files?path=${encodeURIComponent(currentPath)}`, {
+      const res = await fetch(`/api/servers/${uuid}/files?path=${encodeURIComponent(currentPath)}`, {
         headers: { 'Authorization': `Bearer ${token}` }
       });
       if (res.ok) {
@@ -63,7 +63,7 @@ const FileManager: React.FC = () => {
   const handleOpenFile = async (filePath: string) => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:3000/api/servers/${uuid}/files/read`, {
+      const res = await fetch(`/api/servers/${uuid}/files/read`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -89,7 +89,7 @@ const FileManager: React.FC = () => {
   const handleSaveFile = async () => {
     setSaving(true);
     try {
-      const res = await fetch(`http://localhost:3000/api/servers/${uuid}/files/write`, {
+      const res = await fetch(`/api/servers/${uuid}/files/write`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,7 +119,7 @@ const FileManager: React.FC = () => {
     if (!window.confirm(`Are you sure you want to delete ${itemName}?`)) return;
 
     try {
-      const res = await fetch(`http://localhost:3000/api/servers/${uuid}/files`, {
+      const res = await fetch(`/api/servers/${uuid}/files`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -143,7 +143,7 @@ const FileManager: React.FC = () => {
     const targetPath = currentPath ? `${currentPath}/${newItemName}` : newItemName;
 
     try {
-      const res = await fetch(`http://localhost:3000/api/servers/${uuid}/files/write`, {
+      const res = await fetch(`/api/servers/${uuid}/files/write`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -171,7 +171,7 @@ const FileManager: React.FC = () => {
     const archiveName = `${itemName}.zip`;
 
     try {
-      const res = await fetch(`http://localhost:3000/api/servers/${uuid}/files/zip`, {
+      const res = await fetch(`/api/servers/${uuid}/files/zip`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -194,7 +194,7 @@ const FileManager: React.FC = () => {
     const targetPath = currentPath ? `${currentPath}/${itemName}` : itemName;
 
     try {
-      const res = await fetch(`http://localhost:3000/api/servers/${uuid}/files/unzip`, {
+      const res = await fetch(`/api/servers/${uuid}/files/unzip`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

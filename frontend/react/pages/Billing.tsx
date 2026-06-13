@@ -34,10 +34,10 @@ const Billing: React.FC = () => {
   const fetchBillingData = async () => {
     setLoading(true);
     try {
-      const plansRes = await fetch('http://localhost:3000/api/billing/plans', {
+      const plansRes = await fetch('/api/billing/plans', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
-      const invoicesRes = await fetch('http://localhost:3000/api/billing/invoices', {
+      const invoicesRes = await fetch('/api/billing/invoices', {
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
@@ -53,7 +53,7 @@ const Billing: React.FC = () => {
 
   const handlePurchase = async (plan: Plan) => {
     try {
-      const invoiceRes = await fetch('http://localhost:3000/api/billing/invoices', {
+      const invoiceRes = await fetch('/api/billing/invoices', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -75,7 +75,7 @@ const Billing: React.FC = () => {
   const handlePayInvoice = async (invoiceId: string) => {
     setPayingId(invoiceId);
     try {
-      const res = await fetch(`http://localhost:3000/api/billing/invoices/${invoiceId}/pay`, {
+      const res = await fetch(`/api/billing/invoices/${invoiceId}/pay`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

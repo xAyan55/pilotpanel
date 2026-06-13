@@ -1,6 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import { createServer as createHttpServer } from 'http';
+import path from 'path';
 import dotenv from 'dotenv';
 import { authenticateJWT, authenticateNode, requireRole } from './middleware/auth';
 import { register, login, enable2FA, disable2FA, getMe } from './controllers/authController';
@@ -102,6 +103,15 @@ app.get('/api/admin/audit-logs', authenticateJWT, requireRole(['Owner', 'Adminis
   } catch (error) {
     return res.status(500).json({ error: 'Failed to fetch logs.' });
   }
+});
+
+// Serve frontend static assets
+const frontendPath = path.join(__dirname, '../../frontend/dist');
+app.use(express.static(frontendPath));
+
+// Fallback to index.html for SPA routing
+app.get('*', (req, res) => {
+  res.sendFile(path.join(frontendPath, 'index.html'));
 });
 
 // Create HTTP Server
