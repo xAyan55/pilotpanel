@@ -3,6 +3,7 @@ import cors from 'cors';
 import { createServer as createHttpServer } from 'http';
 import path from 'path';
 import dotenv from 'dotenv';
+import axios from 'axios';
 import { authenticateJWT, authenticateNode, requireRole } from './middleware/auth';
 import { register, login, enable2FA, disable2FA, getMe } from './controllers/authController';
 import { registerNode, getNodes, deleteNode, heartbeat } from './controllers/nodeController';
@@ -20,6 +21,63 @@ const port = process.env.PORT || 3000;
 
 app.use(cors({ origin: '*' }));
 app.use(express.json());
+
+// Diagnostic endpoint
+app.get('/api/debug-status', async (req, res) => {
+  try {
+    const nodes = await prisma.node.findMany();
+    const servers = await prisma.server.findMany();
+    
+    const results = [];
+    for (const node of nodes) {
+      const url = `http://${node.ipAddress}:${node.port}/api/servers`;
+      let pingStatus = 'unknown';
+      let pingError = '';
+      try {
+        const resDaemon = await axios.get(url, {
+          headers: {
+            'x-node-token': node.token
+          },
+          timeout: 5000
+        });
+        pingStatus = `success (status ${resDaemon.status})`;
+      } catch (err: any) {
+        pingStatus = 'failed';
+        pingError = err.message + (err.response ? ` - status ${err.response.status} - ${JSON.stringify(err.response.data)}` : '');
+      }
+      results.push({
+        node: {
+          id: node.id,
+          name: node.name,
+          ipAddress: node.ipAddress,
+          port: node.port,
+          tokenSnippet: node.token ? node.token.substring(0, 8) + '...' : 'none',
+          lastHeartbeat: node.lastHeartbeat,
+          isHealthy: node.isHealthy
+        },
+        pingStatus,
+        pingError
+      });
+    }
+
+    return res.json({
+      success: true,
+      results,
+      servers: servers.map(s => ({
+        id: s.id,
+        name: s.name,
+        uuid: s.uuid,
+        nodeId: s.nodeId,
+        port: s.port,
+        status: s.status,
+        software: s.software,
+        version: s.version
+      }))
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error.message });
+  }
+});
 
 // Public Auth routes
 app.post('/api/auth/register', register);
